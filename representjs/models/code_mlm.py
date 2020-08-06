@@ -1,8 +1,8 @@
 import torch
 from torch import nn
 
-from models.encoder import CodeEncoder, CodeEncoderLSTM
-from models.code_moco import CodeMoCo
+from representjs.models.encoder import CodeEncoder, CodeEncoderLSTM
+from representjs.models.code_moco import CodeMoCo
 
 
 class CodeMLM(nn.Module):
@@ -39,7 +39,8 @@ class CodeMLM(nn.Module):
             print("im shape", im.shape)
             print("lengths shape", lengths.shape)
         features = self.head(features).view(L, B, self.d_model)  # L x B x D=d_model
-        logits = torch.matmul(features, self.encoder.embedding.weight.transpose(0, 1)).view(L, B, self.n_tokens)  # [L, B, ntok]
+        logits = torch.matmul(features, self.encoder.embedding.weight.transpose(0, 1)).view(L, B,
+                                                                                            self.n_tokens)  # [L, B, ntok]
         return torch.transpose(logits, 0, 1).view(B, L, self.n_tokens)  # [B, T, ntok]
 
 
@@ -57,7 +58,8 @@ class CodeContrastiveMLM(CodeMoCo):
         L, B, D = features.shape
         assert D == self.d_model
         features = self.mlm_head(features).view(L, B, D)  # L x B x D
-        logits = torch.matmul(features, self.encoder_q.embedding.weight.transpose(0, 1)).view(L, B, self.n_tokens)  # [L, B, ntok]
+        logits = torch.matmul(features, self.encoder_q.embedding.weight.transpose(0, 1)).view(L, B,
+                                                                                              self.n_tokens)  # [L, B, ntok]
         return torch.transpose(logits, 0, 1).view(B, L, self.n_tokens)  # [B, T, ntok]
 
     def moco_forward(self, im_q, im_k):  # logits, labels

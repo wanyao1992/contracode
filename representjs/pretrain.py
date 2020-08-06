@@ -14,10 +14,10 @@ from torch.nn import functional as F
 from torch.nn.utils.rnn import pad_sequence
 
 from representjs import RUN_DIR, CSNJS_DIR
-from data.precomputed_dataset import PrecomputedDataset
-from models.code_mlm import CodeMLM
-from models.code_moco import CodeMoCo
-from utils import accuracy, count_parameters
+from representjs.data.precomputed_dataset import PrecomputedDataset
+from representjs.models.code_mlm import CodeMLM
+from representjs.models.code_moco import CodeMoCo
+from representjs.utils import accuracy, count_parameters
 
 DEFAULT_CSNJS_TRAIN_FILEPATH = str(CSNJS_DIR / "javascript_dedupe_definitions_nonoverlap_v2_train.jsonl.gz")
 DEFAULT_SPM_UNIGRAM_FILEPATH = str(CSNJS_DIR / "csnjs_8k_9995p_unigram_url.model")
@@ -107,7 +107,8 @@ def pretrain(
         subword_regularization_alpha=subword_regularization_alpha,
     )
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate, num_workers=num_workers, drop_last=True,
+        train_dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate, num_workers=num_workers,
+        drop_last=True,
     )
 
     # Create model

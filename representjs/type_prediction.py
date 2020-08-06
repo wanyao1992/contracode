@@ -11,11 +11,11 @@ import tqdm
 import wandb
 from loguru import logger
 
-from data.deeptyper_dataset import DeepTyperDataset, load_type_vocab, get_collate_fn
-from data.util import Timer
-from models.typetransformer import TypeTransformer
+from representjs.data.deeptyper_dataset import DeepTyperDataset, load_type_vocab, get_collate_fn
+from representjs.data.util import Timer
+from representjs.models.typetransformer import TypeTransformer
 from representjs import RUN_DIR
-from utils import count_parameters, get_linear_schedule_with_warmup
+from representjs.utils import count_parameters, get_linear_schedule_with_warmup
 
 
 def accuracy(output, target, topk=(1,), ignore_idx=[]):
@@ -24,7 +24,8 @@ def accuracy(output, target, topk=(1,), ignore_idx=[]):
 
         # Get top predictions per position that are not in ignore_idx
         target_vocab_size = output.size(2)
-        keep_idx = torch.tensor([i for i in range(target_vocab_size) if i not in ignore_idx], device=output.device).long()
+        keep_idx = torch.tensor([i for i in range(target_vocab_size) if i not in ignore_idx],
+                                device=output.device).long()
         _, pred = output[:, :, keep_idx].topk(maxk, 2, True, True)  # BxLx5
         pred = keep_idx[pred]  # BxLx5
 
@@ -86,7 +87,8 @@ def _evaluate(model, loader, sp: spm.SentencePieceProcessor, target_to_id, use_c
                 num5 += corr5
                 num_labels_total += num_labels
 
-                pbar.set_description(f"evaluate average loss {avg_loss:.4f} num1 {num1_any} num_labels_any_total {num_labels_any_total} avg acc1_any {num1_any / (num_labels_any_total + 1e-6) * 100:.4f}")
+                pbar.set_description(
+                    f"evaluate average loss {avg_loss:.4f} num1 {num1_any} num_labels_any_total {num_labels_any_total} avg acc1_any {num1_any / (num_labels_any_total + 1e-6) * 100:.4f}")
 
         # Average accuracies
         acc1 = float(num1) / num_labels_total * 100
@@ -176,11 +178,13 @@ def train(
     # Create training dataset and dataloader
     logger.info(f"Training data path {train_filepath}")
     train_dataset = DeepTyperDataset(
-        train_filepath, type_vocab_filepath, spm_filepath, max_length=max_seq_len, subword_regularization_alpha=subword_regularization_alpha
+        train_filepath, type_vocab_filepath, spm_filepath, max_length=max_seq_len,
+        subword_regularization_alpha=subword_regularization_alpha
     )
     logger.info(f"Training dataset size: {len(train_dataset)}")
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True, collate_fn=collate_fn
+        train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True,
+        collate_fn=collate_fn
     )
 
     # Create eval dataset and dataloader
@@ -200,13 +204,14 @@ def train(
 
     # Create model
     model = TypeTransformer(n_tokens=sp.GetPieceSize(), n_output_tokens=len(id_to_target), pad_id=pad_id,
-        encoder_type=encoder_type, n_encoder_layers=n_encoder_layers, d_model=d_model)
+                            encoder_type=encoder_type, n_encoder_layers=n_encoder_layers, d_model=d_model)
     logger.info(f"Created TypeTransformer {encoder_type} with {count_parameters(model)} params")
 
     # Load pretrained checkpoint
     if pretrain_resume_path:
         assert not resume_path
-        logger.info(f"Resuming training from pretraining checkpoint {pretrain_resume_path}, pretrain_resume_encoder_name={pretrain_resume_encoder_name}")
+        logger.info(
+            f"Resuming training from pretraining checkpoint {pretrain_resume_path}, pretrain_resume_encoder_name={pretrain_resume_encoder_name}")
         checkpoint = torch.load(pretrain_resume_path)
         pretrained_state_dict = checkpoint["model_state_dict"]
         encoder_state_dict = {}
@@ -215,12 +220,14 @@ def train(
 
         for key, value in pretrained_state_dict.items():
             if key.startswith(pretrain_resume_encoder_name + ".") and "project_layer" not in key:
-                remapped_key = key[len(pretrain_resume_encoder_name + ".") :]
+                remapped_key = key[len(pretrain_resume_encoder_name + "."):]
                 logger.debug(f"Remapping checkpoint key {key} to {remapped_key}. Value mean: {value.mean().item()}")
                 encoder_state_dict[remapped_key] = value
-            if key.startswith(pretrain_resume_encoder_name + ".") and "project_layer.0." in key and pretrain_resume_project:
-                remapped_key = key[len(pretrain_resume_encoder_name + ".project_layer.") :]
-                logger.debug(f"Remapping checkpoint project key {key} to output key {remapped_key}. Value mean: {value.mean().item()}")
+            if key.startswith(
+                pretrain_resume_encoder_name + ".") and "project_layer.0." in key and pretrain_resume_project:
+                remapped_key = key[len(pretrain_resume_encoder_name + ".project_layer."):]
+                logger.debug(
+                    f"Remapping checkpoint project key {key} to output key {remapped_key}. Value mean: {value.mean().item()}")
                 output_state_dict[remapped_key] = value
         model.encoder.load_state_dict(encoder_state_dict)
         # TODO: check for head key rather than output for MLM
@@ -231,7 +238,8 @@ def train(
     model = nn.DataParallel(model)
     model = model.cuda() if use_cuda else model
     wandb.watch(model, log="all")
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(adam_beta1, adam_beta2), eps=adam_eps, weight_decay=weight_decay)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(adam_beta1, adam_beta2), eps=adam_eps,
+                                 weight_decay=weight_decay)
     scheduler = get_linear_schedule_with_warmup(optimizer, warmup_steps, num_steps)
     epoch = 0
     global_step = 0
@@ -249,7 +257,8 @@ def train(
 
     # Evaluate initial metrics
     logger.info(f"Evaluating model after epoch {epoch} ({global_step} steps)...")
-    eval_metric, eval_metrics = _evaluate(model, eval_loader, sp, target_to_id=target_to_id, use_cuda=use_cuda, no_output_attention=no_output_attention)
+    eval_metric, eval_metrics = _evaluate(model, eval_loader, sp, target_to_id=target_to_id, use_cuda=use_cuda,
+                                          no_output_attention=no_output_attention)
     for metric, value in eval_metrics.items():
         logger.info(f"Evaluation {metric} after epoch {epoch} ({global_step} steps): {value:.4f}")
     eval_metrics["epoch"] = epoch
@@ -303,7 +312,8 @@ def train(
         # Evaluate
         logger.info(f"Evaluating model after epoch {epoch} ({global_step} steps)...")
         eval_metric, eval_metrics = _evaluate(
-            model, eval_loader, sp, target_to_id=target_to_id, use_cuda=use_cuda, no_output_attention=no_output_attention)
+            model, eval_loader, sp, target_to_id=target_to_id, use_cuda=use_cuda,
+            no_output_attention=no_output_attention)
         for metric, value in eval_metrics.items():
             logger.info(f"Evaluation {metric} after epoch {epoch} ({global_step} steps): {value:.4f}")
         eval_metrics["epoch"] = epoch
@@ -390,7 +400,7 @@ def eval(
 
     # Create model
     model = TypeTransformer(n_tokens=sp.GetPieceSize(), n_output_tokens=len(id_to_target), pad_id=pad_id,
-        encoder_type=encoder_type, n_encoder_layers=n_encoder_layers, d_model=d_model)
+                            encoder_type=encoder_type, n_encoder_layers=n_encoder_layers, d_model=d_model)
     logger.info(f"Created TypeTransformer {encoder_type} with {count_parameters(model)} params")
     model = nn.DataParallel(model)
     model = model.cuda() if use_cuda else model
@@ -406,7 +416,8 @@ def eval(
 
         # Evaluate metrics
         logger.info(f"Evaluating model after epoch {epoch} ({global_step} steps)...")
-        _, eval_metrics = _evaluate(model, eval_loader, sp, target_to_id=target_to_id, use_cuda=use_cuda, no_output_attention=no_output_attention)
+        _, eval_metrics = _evaluate(model, eval_loader, sp, target_to_id=target_to_id, use_cuda=use_cuda,
+                                    no_output_attention=no_output_attention)
         for metric, value in eval_metrics.items():
             logger.info(f"Evaluation {metric} after epoch {epoch} ({global_step} steps): {value:.4f}")
 

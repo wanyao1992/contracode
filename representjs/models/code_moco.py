@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from models.encoder import CodeEncoder, CodeEncoderLSTM
+from representjs.models.encoder import CodeEncoder, CodeEncoderLSTM
 
 
 class MoCoTemplate(nn.Module):
@@ -53,7 +53,7 @@ class MoCoTemplate(nn.Module):
         assert self.K % batch_size == 0  # for simplicity
 
         # replace the keys at ptr (dequeue and enqueue)
-        self.queue[:, ptr : ptr + batch_size] = keys.T
+        self.queue[:, ptr: ptr + batch_size] = keys.T
         ptr = (ptr + batch_size) % self.K  # move pointer
 
         self.queue_ptr[0] = ptr
@@ -124,11 +124,14 @@ def concat_all_gather(tensor):
 
 class CodeMoCo(MoCoTemplate):
     def __init__(self, n_tokens, d_model=512, d_rep=128, K=107520, m=0.999, T=0.07, encoder_config={}, pad_id=None):
-        super().__init__(d_rep, K, m, T, dict(n_tokens=n_tokens, d_model=d_model, d_rep=d_rep, pad_id=pad_id, **encoder_config))
+        super().__init__(d_rep, K, m, T,
+                         dict(n_tokens=n_tokens, d_model=d_model, d_rep=d_rep, pad_id=pad_id, **encoder_config))
 
-    def make_encoder(self, n_tokens, d_model, d_rep, pad_id=None, encoder_type="transformer", lstm_project_mode="hidden", n_encoder_layers=6, dropout=0.1, **kwargs):
+    def make_encoder(self, n_tokens, d_model, d_rep, pad_id=None, encoder_type="transformer",
+                     lstm_project_mode="hidden", n_encoder_layers=6, dropout=0.1, **kwargs):
         if encoder_type == "transformer":
-            return CodeEncoder(n_tokens, project=True, pad_id=pad_id, d_model=d_model, d_rep=d_rep, n_encoder_layers=n_encoder_layers, **kwargs)
+            return CodeEncoder(n_tokens, project=True, pad_id=pad_id, d_model=d_model, d_rep=d_rep,
+                               n_encoder_layers=n_encoder_layers, **kwargs)
         elif encoder_type == "lstm":
             return CodeEncoderLSTM(
                 n_tokens=n_tokens,

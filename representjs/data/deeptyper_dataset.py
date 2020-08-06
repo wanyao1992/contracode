@@ -6,7 +6,6 @@ from torch.nn.utils.rnn import pad_sequence
 
 from representjs.data.util import normalize_program
 
-
 TYPED_MARKER_START = "__LS__"
 TYPED_MARKER_END = "__LE__"
 
@@ -31,7 +30,7 @@ def _tokenize(deeptyper_line, sp, target_to_id, max_length, split_source_targets
         # Code tokens and type labels are delimited by space after </s>, as in .txt files
         js_end = deeptyper_line.index("</s>") + len("</s>")
         js_tokens = deeptyper_line[:js_end]
-        labels = deeptyper_line[js_end + 1 :]
+        labels = deeptyper_line[js_end + 1:]
 
     # Split code by spaces to get DeepTyper tokens, excluding <s>, </s>
     js_tokens = js_tokens.split(" ")[1:-1]
@@ -112,7 +111,8 @@ def load_type_vocab(vocab_path):
 
 
 class DeepTyperDataset(torch.utils.data.Dataset):
-    def __init__(self, data_path, type_vocab_path, sentencepiece_filepath, max_length=1024, subword_regularization_alpha=0.0, split_source_targets_by_tab=False):
+    def __init__(self, data_path, type_vocab_path, sentencepiece_filepath, max_length=1024,
+                 subword_regularization_alpha=0.0, split_source_targets_by_tab=False):
         assert subword_regularization_alpha == 0.0
         self.max_length = max_length
         self.subword_regularization_alpha = subword_regularization_alpha
@@ -166,4 +166,3 @@ def get_collate_fn(pad_id, no_type_id):
         return X, lengths, output_attn, labels
 
     return collate_fn
-

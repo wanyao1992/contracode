@@ -13,14 +13,14 @@ import tqdm
 import wandb
 from loguru import logger
 
-from data.jsonl_dataset import get_csnjs_dataset
-from data.old_dataloader import javascript_dataloader
-from data.util import Timer
-from metrics.f1 import F1MetricMethodName
-from models.transformer import TransformerModel, Seq2SeqLSTM
+from representjs.data.jsonl_dataset import get_csnjs_dataset
+from representjs.data.old_dataloader import javascript_dataloader
+from representjs.data.util import Timer
+from representjs.metrics.f1 import F1MetricMethodName
+from representjs.models.transformer import TransformerModel, Seq2SeqLSTM
 from representjs import RUN_DIR
-from utils import count_parameters, get_linear_schedule_with_warmup
-from decode import ids_to_strs, beam_search_decode
+from representjs.utils import count_parameters, get_linear_schedule_with_warmup
+from representjs.decode import ids_to_strs, beam_search_decode
 
 # Default argument values
 DATA_DIR = "data/codesearchnet_javascript"
@@ -31,7 +31,8 @@ CSNJS_TEST_FILEPATH = os.path.join(DATA_DIR, "javascript_test_0.jsonl.gz")
 SPM_UNIGRAM_FILEPATH = os.path.join(DATA_DIR, "csnjs_8k_9995p_unigram_url.model")
 
 
-def _evaluate(model, loader, sp: spm.SentencePieceProcessor, use_cuda=True, num_to_print=8, beam_search_k=5, max_decode_len=20, loss_type="nll_token"):
+def _evaluate(model, loader, sp: spm.SentencePieceProcessor, use_cuda=True, num_to_print=8, beam_search_k=5,
+              max_decode_len=20, loss_type="nll_token"):
     model.eval()
     pad_id = sp.PieceToId("[PAD]")
 
@@ -65,9 +66,9 @@ def _evaluate(model, loader, sp: spm.SentencePieceProcessor, use_cuda=True, num_
                 if loss_type == "nll_sequence":
                     loss = F.cross_entropy(logits.transpose(1, 2), Y[:, 1:], ignore_index=pad_id, reduction='sum')
                     loss = loss / X.size(0)  # Average over num sequences, not target sequence lengths
-                                            # Thus, minimize bits per sequence.
+                    # Thus, minimize bits per sequence.
                 elif loss_type == "nll_token":
-                    loss = F.cross_entropy(logits.transpose(1, 2), Y[:, 1:], ignore_index=pad_id,)
+                    loss = F.cross_entropy(logits.transpose(1, 2), Y[:, 1:], ignore_index=pad_id, )
 
                 # TODO: Compute Precision/Recall/F1 and BLEU
 
@@ -100,7 +101,8 @@ def calculate_f1_metric(
                 X_lengths, Y_lengths = X_lengths.cuda(), Y_lengths.cuda()
             with Timer() as t:
                 # pred, scores = beam_search_decode(model, X, sp, k=beam_search_k, max_decode_len=max_decode_len)
-                pred, scores = beam_search_decode(model, X, X_lengths, sp, k=beam_search_k, max_decode_len=max_decode_len)
+                pred, scores = beam_search_decode(model, X, X_lengths, sp, k=beam_search_k,
+                                                  max_decode_len=max_decode_len)
             logger.info(f"Took {t.interval:.2f}s to decode {X.size(0)} identifiers")
             for i in range(X.size(0)):
                 gt_identifier = ids_to_strs(Y[i], sp)
@@ -116,7 +118,8 @@ def calculate_f1_metric(
                 n_examples += 1
                 if logger_fn is not None:
                     logger_fn({"precision_item": precision_item, "recall_item": score_item, "f1_item": f1_item})
-                    logger_fn({"precision_avg": precision / n_examples, "recall_avg": recall / n_examples, "f1_avg": f1 / n_examples})
+                    logger_fn({"precision_avg": precision / n_examples, "recall_avg": recall / n_examples,
+                               "f1_avg": f1 / n_examples})
     logger.debug(f"Test set evaluation (F1) took {t.interval:.3}s over {n_examples} samples")
     return precision / n_examples, recall / n_examples, f1 / n_examples, sample_generations
 
@@ -140,8 +143,9 @@ def calculate_nll(
                 X_lengths, Y_lengths = X_lengths.cuda(), Y_lengths.cuda()
             pred_y = model(X, Y[:, :-1].to(X.device), X_lengths, Y_lengths)
             B, X, D = pred_y.shape
-            loss = F.cross_entropy(pred_y.reshape(B * X, D), Y[:, 1:].reshape(B * X), ignore_index=pad_id, reduction='sum')
-            
+            loss = F.cross_entropy(pred_y.reshape(B * X, D), Y[:, 1:].reshape(B * X), ignore_index=pad_id,
+                                   reduction='sum')
+
             n_examples += B
             test_nll += loss.item()
             if logger_fn is not None:
@@ -186,7 +190,8 @@ def test(
 
     pad_id = sp.PieceToId("[PAD]")
     if model_type == "transformer":
-        model = TransformerModel(n_tokens=sp.GetPieceSize(), pad_id=pad_id, n_decoder_layers=n_decoder_layers, d_model=d_model)
+        model = TransformerModel(n_tokens=sp.GetPieceSize(), pad_id=pad_id, n_decoder_layers=n_decoder_layers,
+                                 d_model=d_model)
         logger.info(f"Created TransformerModel with {count_parameters(model)} params")
     elif model_type == "lstm":
         model = Seq2SeqLSTM(n_tokens=sp.GetPieceSize(), pad_id=pad_id, d_model=d_model)
@@ -218,7 +223,8 @@ def test(
     metric = F1MetricMethodName()
     model.eval()
     with torch.no_grad():
-        precision, recall, f1, sample_generations = calculate_f1_metric(metric, model, test_loader, sp, use_cuda=use_cuda, logger_fn=wandb.log)
+        precision, recall, f1, sample_generations = calculate_f1_metric(metric, model, test_loader, sp,
+                                                                        use_cuda=use_cuda, logger_fn=wandb.log)
     logger.info(f"NLL: {test_nll:.5f}")
     logger.info(f"Precision: {precision:.5f}%")
     logger.info(f"Recall: {recall:.5f}%")
@@ -256,7 +262,7 @@ def train(
     adam_beta1: float = 0.9,
     adam_beta2: float = 0.98,
     use_lr_warmup: bool = True,
-    loss_type = "nll_token",  # nll_token or nll_sequence
+    loss_type="nll_token",  # nll_token or nll_sequence
     # Loss
     subword_regularization_alpha: float = 0,
     # Computational
@@ -322,7 +328,8 @@ def train(
     # Create model
     pad_id = sp.PieceToId("[PAD]")
     if model_type == "transformer":
-        model = TransformerModel(n_tokens=sp.GetPieceSize(), pad_id=pad_id, n_decoder_layers=n_decoder_layers, d_model=d_model)
+        model = TransformerModel(n_tokens=sp.GetPieceSize(), pad_id=pad_id, n_decoder_layers=n_decoder_layers,
+                                 d_model=d_model)
         logger.info(f"Created TransformerModel with {count_parameters(model)} params")
     elif model_type == "lstm":
         model = Seq2SeqLSTM(n_tokens=sp.GetPieceSize(), pad_id=pad_id, d_model=d_model)
@@ -338,12 +345,13 @@ def train(
 
         for key, value in pretrained_state_dict.items():
             if key.startswith(resume_encoder_name + ".") and "project_layer" not in key:
-                remapped_key = key[len(resume_encoder_name + ".") :]
+                remapped_key = key[len(resume_encoder_name + "."):]
                 logger.debug(f"Remapping checkpoint key {key} to {remapped_key}. Value mean: {value.mean().item()}")
                 encoder_state_dict[remapped_key] = value
             if key.startswith(resume_encoder_name + ".") and "project_layer.0." in key and resume_project:
-                remapped_key = key[len(resume_encoder_name + ".") :]
-                logger.debug(f"Remapping checkpoint project key {key} to {remapped_key}. Value mean: {value.mean().item()}")
+                remapped_key = key[len(resume_encoder_name + "."):]
+                logger.debug(
+                    f"Remapping checkpoint project key {key} to {remapped_key}. Value mean: {value.mean().item()}")
                 encoder_state_dict[remapped_key] = value
         model.encoder.load_state_dict(encoder_state_dict, strict=False)
         logger.info(f"Loaded state dict from {resume_path}")
@@ -381,9 +389,9 @@ def train(
             if loss_type == "nll_sequence":
                 loss = F.cross_entropy(logits.transpose(1, 2), Y[:, 1:], ignore_index=pad_id, reduction='sum')
                 loss = loss / X.size(0)  # Average over num sequences, not target sequence lengths
-                                        # Thus, minimize bits per sequence.
+                # Thus, minimize bits per sequence.
             elif loss_type == "nll_token":
-                loss = F.cross_entropy(logits.transpose(1, 2), Y[:, 1:], ignore_index=pad_id,)
+                loss = F.cross_entropy(logits.transpose(1, 2), Y[:, 1:], ignore_index=pad_id, )
             loss.backward()
             optimizer.step()
             scheduler.step()
@@ -391,14 +399,16 @@ def train(
             # Log loss
             global_step += 1
             wandb.log(
-                {"epoch": epoch, f"label-{label_mode}/train_loss": loss.item(), "lr": scheduler.get_last_lr()[0]}, step=global_step
+                {"epoch": epoch, f"label-{label_mode}/train_loss": loss.item(), "lr": scheduler.get_last_lr()[0]},
+                step=global_step
             )
             pbar.set_description(f"epoch {epoch} loss {loss.item():.4f}")
 
         # Evaluate
         logger.info(f"Evaluating model after epoch {epoch} ({global_step} steps)...")
         max_decode_len = 20 if label_mode == "identifier" else 200
-        eval_loss = _evaluate(model, eval_loader, sp, use_cuda=use_cuda, max_decode_len=max_decode_len, loss_type=loss_type)
+        eval_loss = _evaluate(model, eval_loader, sp, use_cuda=use_cuda, max_decode_len=max_decode_len,
+                              loss_type=loss_type)
         logger.info(f"Evaluation loss after epoch {epoch} ({global_step} steps): {eval_loss:.4f}")
         wandb.log({"epoch": epoch, f"label-{label_mode}/eval_loss": eval_loss}, step=global_step)
 

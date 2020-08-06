@@ -5,7 +5,7 @@ from loguru import logger
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 
-from data.transforms import (
+from representjs.data.transforms import (
     Transform,
     # WindowLineCropTransform,
     CanonicalizeKeysTransform,
@@ -13,11 +13,12 @@ from data.transforms import (
     NodeServerTransform,
     NumericalizeTransform,
 )
-from data.jsonl_dataset import JSONLinesDataset
+from representjs.data.jsonl_dataset import JSONLinesDataset
 
 
 class AugmentedJSDataset(Dataset):
-    def __init__(self, json_dataset: JSONLinesDataset, transform: Transform = None, max_length: int = 1024, contrastive=False):
+    def __init__(self, json_dataset: JSONLinesDataset, transform: Transform = None, max_length: int = 1024,
+                 contrastive=False):
         self.contrastive = contrastive
         self.json_dataset = json_dataset
         self.transform = transform
@@ -60,7 +61,8 @@ class PadCollateWrapper:
     def __call__(self, batch):
         batch_size = len(batch)
         if self.contrastive:
-            assert "data_key" in batch[0].keys() and "data_query" in batch[0].keys(), "Missing contrastive keys, {}".format(batch[0].keys())
+            assert "data_key" in batch[0].keys() and "data_query" in batch[
+                0].keys(), "Missing contrastive keys, {}".format(batch[0].keys())
             data_key_list = [sample["data_key"] for sample in batch]
             data_query_list = [sample["data_query"] for sample in batch]
             data = pad_sequence(data_key_list + data_query_list, padding_value=self.pad_id, batch_first=True)  # [2B, T]

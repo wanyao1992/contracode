@@ -5,7 +5,7 @@ import sentencepiece as spm
 import torch
 import tqdm
 
-from models.code_moco import CodeMoCo
+from representjs.models.code_moco import CodeMoCo
 from representjs import RUN_DIR, CSNJS_DIR
 
 DEFAULT_CSNJS_TRAIN_FILEPATH = str(CSNJS_DIR / "javascript_dedupe_definitions_nonoverlap_v2_train.jsonl.gz")

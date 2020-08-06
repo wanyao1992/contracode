@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn as nn
 
-from models.encoder import CodeEncoder, CodeEncoderLSTM
+from representjs.models.encoder import CodeEncoder, CodeEncoderLSTM
 
 
 class TypeTransformer(nn.Module):
@@ -31,7 +31,8 @@ class TypeTransformer(nn.Module):
         assert (encoder_type in ["transformer", "lstm"])
         if encoder_type == "transformer":
             self.encoder = CodeEncoder(
-                n_tokens, d_model, d_rep, n_head, n_encoder_layers, d_ff, dropout, activation, norm, pad_id, project=False
+                n_tokens, d_model, d_rep, n_head, n_encoder_layers, d_ff, dropout, activation, norm, pad_id,
+                project=False
             )
             # TODO: Try LeakyReLU
             self.output = nn.Sequential(nn.Linear(d_model, d_model), nn.ReLU(), nn.Linear(d_model, n_output_tokens))
@@ -45,7 +46,7 @@ class TypeTransformer(nn.Module):
                 pad_id=pad_id,
                 project=False
             )
-            self.output = nn.Sequential(nn.Linear(d_model*2, d_model), nn.ReLU(), nn.Linear(d_model, n_output_tokens))
+            self.output = nn.Sequential(nn.Linear(d_model * 2, d_model), nn.ReLU(), nn.Linear(d_model, n_output_tokens))
 
     def forward(self, src_tok_ids, lengths=None, output_attention=None):
         r"""

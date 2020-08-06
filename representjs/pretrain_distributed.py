@@ -15,11 +15,11 @@ import torch.multiprocessing as mp
 from torch.nn.utils.rnn import pad_sequence
 from torch.optim.lr_scheduler import LambdaLR
 
-from models.code_mlm import CodeMLM, CodeContrastiveMLM
+from representjs.models.code_mlm import CodeMLM, CodeContrastiveMLM
 from representjs import RUN_DIR, CSNJS_DIR
-from data.precomputed_dataset import PrecomputedDataset
-from models.code_moco import CodeMoCo
-from utils import accuracy, count_parameters, get_linear_schedule_with_warmup
+from representjs.data.precomputed_dataset import PrecomputedDataset
+from representjs.models.code_moco import CodeMoCo
+from representjs.utils import accuracy, count_parameters, get_linear_schedule_with_warmup
 
 DEFAULT_CSNJS_TRAIN_FILEPATH = str(CSNJS_DIR / "javascript_dedupe_definitions_nonoverlap_v2_train.jsonl.gz")
 DEFAULT_SPM_UNIGRAM_FILEPATH = str(CSNJS_DIR / "csnjs_8k_9995p_unigram_url.model")
@@ -69,7 +69,8 @@ def mask_mlm(seq, pad_id, mask_id, vocab_start_range, vocab_end_range):
     return seq, targets
 
 
-def training_step_mlm(sp, model, batch, mask_id: int, pad_id: int, vocab_start_idx: int, vocab_end_idx: int, use_cuda=True):
+def training_step_mlm(sp, model, batch, mask_id: int, pad_id: int, vocab_start_idx: int, vocab_end_idx: int,
+                      use_cuda=True):
     seq, lengths, _ = batch  # B x L
     if use_cuda:
         seq = seq.cuda()
@@ -100,7 +101,8 @@ def training_step_hybrid(sp, model, batch, mask_id, pad_id, vocab_start_idx, voc
     moco_loss = F.cross_entropy(moco_logits, moco_targets)
     moco_acc1, moco_acc5 = accuracy(moco_logits, moco_targets, topk=(1, 5))
     mlm_loss = F.cross_entropy(predicted_masked_tokens.flatten(end_dim=1), mlm_targets.flatten(), ignore_index=pad_id)
-    mlm_acc1, mlm_acc5 = accuracy(predicted_masked_tokens[mlm_targets != pad_id], mlm_targets[mlm_targets != pad_id], topk=(1, 5))
+    mlm_acc1, mlm_acc5 = accuracy(predicted_masked_tokens[mlm_targets != pad_id], mlm_targets[mlm_targets != pad_id],
+                                  topk=(1, 5))
     loss = 4 * moco_loss + mlm_loss
     logs = {
         "pretrain/moco/loss": moco_loss.item(),
@@ -207,7 +209,8 @@ def pretrain_worker(gpu, ngpus_per_node, config):
     # global rank among all the processes
     config["rank"] = config["rank"] * ngpus_per_node + gpu
     dist.init_process_group(
-        backend=config["dist_backend"], init_method=config["dist_url"], world_size=config["world_size"], rank=config["rank"]
+        backend=config["dist_backend"], init_method=config["dist_url"], world_size=config["world_size"],
+        rank=config["rank"]
     )
 
     sp = spm.SentencePieceProcessor()
@@ -248,7 +251,8 @@ def pretrain_worker(gpu, ngpus_per_node, config):
         ))
         logger.info(f"Created CodeMoCo model with {count_parameters(model)} params")
     elif config["loss_mode"] == "mlm":
-        model = CodeMLM(sp.GetPieceSize(), pad_id=pad_id, encoder_type=config["encoder_type"], n_encoder_layers=config["n_encoder_layers"])
+        model = CodeMLM(sp.GetPieceSize(), pad_id=pad_id, encoder_type=config["encoder_type"],
+                        n_encoder_layers=config["n_encoder_layers"])
         logger.info(f"Created CodeMLM model with {count_parameters(model)} params")
     elif config["loss_mode"] == "hybrid":
         model = CodeContrastiveMLM(sp.GetPieceSize(), pad_id=pad_id)
@@ -273,7 +277,8 @@ def pretrain_worker(gpu, ngpus_per_node, config):
         model = torch.nn.parallel.DistributedDataParallel(model)
 
     # define optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=config["lr"], betas=config["adam_betas"], eps=1e-6, weight_decay=config["weight_decay"])
+    optimizer = torch.optim.Adam(model.parameters(), lr=config["lr"], betas=config["adam_betas"], eps=1e-6,
+                                 weight_decay=config["weight_decay"])
     sched = get_linear_schedule_with_warmup(optimizer, config["warmup_steps"], config["num_steps"])
 
     # Setup data
@@ -313,11 +318,13 @@ def pretrain_worker(gpu, ngpus_per_node, config):
             elif config["loss_mode"] == "mlm":
                 # replace tokens randomly with tokens from _ (8)
                 train_metrics = training_step_mlm(
-                    sp, model, batch, pad_id=pad_id, mask_id=mask_id, vocab_start_idx=8, vocab_end_idx=7999, use_cuda=config["use_cuda"]
+                    sp, model, batch, pad_id=pad_id, mask_id=mask_id, vocab_start_idx=8, vocab_end_idx=7999,
+                    use_cuda=config["use_cuda"]
                 )
             elif config["loss_mode"] == "hybrid":
                 train_metrics = training_step_hybrid(
-                    sp, model, batch, mask_id=mask_id, pad_id=pad_id, vocab_start_idx=0, vocab_end_idx=7999, use_cuda=config["use_cuda"]
+                    sp, model, batch, mask_id=mask_id, pad_id=pad_id, vocab_start_idx=0, vocab_end_idx=7999,
+                    use_cuda=config["use_cuda"]
                 )
             else:
                 raise ValueError("Bad loss type")
@@ -342,7 +349,8 @@ def pretrain_worker(gpu, ngpus_per_node, config):
                         "global_step": global_step,
                         "config": config,
                     }
-                    model_file = os.path.join(config["run_dir"], f"ckpt_pretrain_ep{epoch:04d}_step{global_step:07d}.pth")
+                    model_file = os.path.join(config["run_dir"],
+                                              f"ckpt_pretrain_ep{epoch:04d}_step{global_step:07d}.pth")
                     logger.info(f"Saving checkpoint to {model_file}...")
                     torch.save(checkpoint, model_file)
                     wandb.save(str(model_file))

@@ -6,8 +6,8 @@ import numpy as np
 import torch
 from loguru import logger
 
-from data.util import Timer
-from data.util import normalize_program
+from representjs.data.util import Timer
+from representjs.data.util import normalize_program
 
 
 class PrecomputedDataset(torch.utils.data.Dataset):

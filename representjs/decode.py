@@ -117,7 +117,7 @@ def beam_search_decode(model, X, X_lengths, sp: spm.SentencePieceProcessor, max_
             for Y_hat, scores in sequences:
                 Y_hat = Y_hat.to(X.device)
                 scores = scores.to(X.device)
-                logits = model(X, Y_hat[:, :t+1].to(X.device), src_lengths=X_lengths, tgt_lengths=Y_hat_lengths + 1)
+                logits = model(X, Y_hat[:, :t + 1].to(X.device), src_lengths=X_lengths, tgt_lengths=Y_hat_lengths + 1)
                 logits_t = logits[:, t, :]
                 logprobs_t = F.log_softmax(logits_t, dim=-1).to(scores.device)  # [B, V] tensor
                 for j in range(V):

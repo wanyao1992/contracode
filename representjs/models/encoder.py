@@ -66,6 +66,7 @@ class CodeEncoder(nn.Module):
         else:
             return out
 
+
 class CodeEncoderLSTM(nn.Module):
     def __init__(
         self,
@@ -83,7 +84,7 @@ class CodeEncoderLSTM(nn.Module):
         self.embedding = nn.Embedding(n_tokens, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout, max_len=9000)
 
-        #Currently using 2 layers of LSTM
+        # Currently using 2 layers of LSTM
         print(f"CodeEncoderLSTM: Creating BiLSTM with {n_encoder_layers} layers, {d_model} hidden and input size")
         # TODO: Apply dropout to LSTM
         self.encoder = nn.LSTM(input_size=d_model, hidden_size=d_model, num_layers=n_encoder_layers, bidirectional=True)
@@ -112,7 +113,8 @@ class CodeEncoderLSTM(nn.Module):
         out, (h_n, c_n) = self.encoder(src_emb_packed)  # TxBxD
         out, _ = torch.nn.utils.rnn.pad_packed_sequence(out)
         if out.size(0) != T:
-            print("WARNING: unexpected size of encoder output: out.shape=", out.shape, "x.shape=", x.shape, "src_emb.shape=", src_emb.shape)
+            print("WARNING: unexpected size of encoder output: out.shape=", out.shape, "x.shape=", x.shape,
+                  "src_emb.shape=", src_emb.shape)
             print("lengths.max()=", lengths.max())
             print("lengths.min()=", lengths.min())
 
@@ -122,7 +124,8 @@ class CodeEncoderLSTM(nn.Module):
                 rep = out.mean(dim=0)  # B x n_directions*d_model
             elif self.config["project"] == "sequence_mean_nonpad":
                 out_ = out.transpose(0, 1)  # B x T x n_directions*d_model
-                mask = torch.arange(out_.size(1), device=out_.device).unsqueeze(0).unsqueeze(-1).expand_as(out_) < lengths.unsqueeze(1).unsqueeze(2)
+                mask = torch.arange(out_.size(1), device=out_.device).unsqueeze(0).unsqueeze(-1).expand_as(
+                    out_) < lengths.unsqueeze(1).unsqueeze(2)
                 rep = (out_ * mask.float()).sum(dim=1)  # B x n_directions*d_model
                 rep = rep / lengths.unsqueeze(1).float()
             elif self.config["project"] == "hidden":

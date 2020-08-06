@@ -8,9 +8,9 @@ import torch
 from loguru import logger
 from torch.nn.utils.rnn import pad_sequence
 
-from data.jsonl_dataset import JSONLinesDataset
-from data.util import normalize_program
-from data.util import dispatch_to_node
+from representjs.data.jsonl_dataset import JSONLinesDataset
+from representjs.data.util import normalize_program
+from representjs.data.util import dispatch_to_node
 
 
 def _augment(transform_payload: List[dict]) -> List[str]:
@@ -51,7 +51,8 @@ def _augment_server(transform_payload: List[dict]) -> List[str]:
     transform_payload = transform_payload
     response = None
     try:
-        response = requests.post("http://127.0.0.1:3000", data=json.dumps(transform_payload), headers=_headers, timeout=5)
+        response = requests.post("http://127.0.0.1:3000", data=json.dumps(transform_payload), headers=_headers,
+                                 timeout=5)
         assert response.status_code == 200
         transformed = response.json()
         assert isinstance(transformed, list)

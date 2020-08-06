@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn as nn
 
-from models.encoder import CodeEncoder, CodeEncoderLSTM
+from representjs.models.encoder import CodeEncoder, CodeEncoderLSTM
 
 
 class TransformerModel(nn.Module):
@@ -57,7 +57,8 @@ class TransformerModel(nn.Module):
             tgt_key_padding_mask = None
         else:
             tgt_key_padding_mask = tgt_tok_ids == self.config["pad_id"]
-        output = self.decoder(tgt_emb, memory, tgt_mask=tgt_mask, memory_mask=None, tgt_key_padding_mask=tgt_key_padding_mask)
+        output = self.decoder(tgt_emb, memory, tgt_mask=tgt_mask, memory_mask=None,
+                              tgt_key_padding_mask=tgt_key_padding_mask)
 
         logits = torch.matmul(output, self.encoder.embedding.weight.transpose(0, 1))  # [T, B, ntok]
         return torch.transpose(logits, 0, 1)  # [B, T, ntok]
@@ -123,7 +124,8 @@ class Seq2SeqLSTM(nn.Module):
         # Decode, using the same embedding as the encoder
         # TODO: Try a different subword vocab, or a non-subword vocab
         tgt_emb = self.encoder.embedding(tgt_tok_ids).transpose(0, 1) * math.sqrt(self.config["d_model"])
-        tgt_emb_packed = torch.nn.utils.rnn.pack_padded_sequence(tgt_emb, tgt_lengths - 1, enforce_sorted=False)  # subtract 1 from lengths since targets are expected to be shifted
+        tgt_emb_packed = torch.nn.utils.rnn.pack_padded_sequence(tgt_emb, tgt_lengths - 1,
+                                                                 enforce_sorted=False)  # subtract 1 from lengths since targets are expected to be shifted
         output, _ = self.decoder(tgt_emb_packed, (oh_0, self.decoder_c_0.expand_as(oh_0)))  # [T, B, d_rep] (packed)
         # output = self.decoder_proj(output)  # [T, B, d_model] (packed)
         # print("Prior to pading output, shapes:")
