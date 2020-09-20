@@ -26,8 +26,6 @@ class TypeTransformer(nn.Module):
         assert norm
         assert pad_id is not None
         self.config = {k: v for k, v in locals().items() if k != "self"}
-        self.d_model = d_model
-        self.n_tokens = n_tokens
 
         # Encoder and output for type prediction
         assert (encoder_type in ["transformer", "lstm"])
@@ -37,9 +35,7 @@ class TypeTransformer(nn.Module):
                 project=False
             )
             # TODO: Try LeakyReLU
-            # self.head = nn.Sequential(nn.Linear(d_model, d_model), nn.ReLU(), nn.Linear(d_model, n_output_tokens))
-            self.head = nn.Sequential(nn.Linear(d_model, d_model), nn.ReLU(), nn.LayerNorm(d_model))
-
+            self.head = nn.Sequential(nn.Linear(d_model, d_model), nn.ReLU(), nn.Linear(d_model, n_output_tokens))
         elif encoder_type == "lstm":
             self.encoder = CodeEncoderLSTM(
                 n_tokens=n_tokens,
@@ -63,17 +59,11 @@ class TypeTransformer(nn.Module):
 
         # Encode
         memory = self.encoder(src_tok_ids, lengths)  # LxBxD
-        L, B, D = memory.shape
         memory = memory.transpose(0, 1)  # BxLxD
 
         if output_attention is not None:
             # Aggregate features to the starting token in each labeled identifier
             memory = torch.matmul(output_attention, memory)  # BxLxD
 
-        memory = self.head(memory).view(L, B, self.d_model)  # L x B x D=d_model
-        logits = torch.matmul(memory, self.encoder.embedding.weight.transpose(0, 1)).view(L, B,
-                                                                                            self.n_tokens)  # [L, B, ntok]
-        # return logits
-        return torch.transpose(logits, 0, 1).view(B, L, self.n_tokens)  # [B, T, ntok]
-        # # Predict logits over types
-        # return self.head(memory)  # BxLxV
+        # Predict logits over types
+        return self.head(memory)  # BxLxV

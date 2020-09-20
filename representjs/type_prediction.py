@@ -159,7 +159,7 @@ def train(
     logger.info(f"Saving logs, model checkpoints to {run_dir}")
     config = locals()
     logger.info(f"Config: {config}")
-    wandb.init(name=run_name, config=config, job_type="training", project="type_prediction", entity="ml4code")
+    # wandb.init(name=run_name, config=config, job_type="training", project="type_prediction", entity="ml4code")
 
     if use_cuda:
         assert torch.cuda.is_available(), "CUDA not available. Check env configuration, or pass --use_cuda False"
@@ -237,7 +237,7 @@ def train(
     # Set up optimizer
     model = nn.DataParallel(model)
     model = model.cuda() if use_cuda else model
-    wandb.watch(model, log="all")
+    # wandb.watch(model, log="all")
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(adam_beta1, adam_beta2), eps=adam_eps,
                                  weight_decay=weight_decay)
     scheduler = get_linear_schedule_with_warmup(optimizer, warmup_steps, num_steps)
@@ -262,7 +262,7 @@ def train(
     for metric, value in eval_metrics.items():
         logger.info(f"Evaluation {metric} after epoch {epoch} ({global_step} steps): {value:.4f}")
     eval_metrics["epoch"] = epoch
-    wandb.log(eval_metrics, step=global_step)
+    # wandb.log(eval_metrics, step=global_step)
 
     for epoch in tqdm.trange(epoch + 1, num_epochs + 1, desc="training", unit="epoch", leave=False):
         logger.info(f"Starting epoch {epoch}\n")
@@ -295,18 +295,18 @@ def train(
 
             # Log loss
             global_step += 1
-            wandb.log(
-                {
-                    "epoch": epoch,
-                    "train/loss": loss.item(),
-                    "train/acc@1": acc1,
-                    "train/acc@5": acc5,
-                    "train/acc@1_any": acc1_any,
-                    "train/acc@5_any": acc5_any,
-                    "lr": scheduler.get_last_lr()[0],
-                },
-                step=global_step,
-            )
+            # wandb.log(
+            #     {
+            #         "epoch": epoch,
+            #         "train/loss": loss.item(),
+            #         "train/acc@1": acc1,
+            #         "train/acc@5": acc5,
+            #         "train/acc@1_any": acc1_any,
+            #         "train/acc@5_any": acc5_any,
+            #         "lr": scheduler.get_last_lr()[0],
+            #     },
+            #     step=global_step,
+            # )
             pbar.set_description(f"epoch {epoch} loss {loss.item():.4f}")
 
         # Evaluate
@@ -317,7 +317,7 @@ def train(
         for metric, value in eval_metrics.items():
             logger.info(f"Evaluation {metric} after epoch {epoch} ({global_step} steps): {value:.4f}")
         eval_metrics["epoch"] = epoch
-        wandb.log(eval_metrics, step=global_step)
+        # wandb.log(eval_metrics, step=global_step)
 
         # Save checkpoint
         if save_every and epoch % save_every == 0 or eval_metric < min_eval_metric:
@@ -393,6 +393,8 @@ def eval(
         subword_regularization_alpha=subword_regularization_alpha,
         split_source_targets_by_tab=eval_filepath.endswith(".json")
     )
+    eval_dataset.__getitem__(3)
+
     logger.info(f"Eval dataset size: {len(eval_dataset)}")
     eval_loader = torch.utils.data.DataLoader(
         eval_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=collate_fn
@@ -401,6 +403,35 @@ def eval(
     # Create model
     model = TypeTransformer(n_tokens=sp.GetPieceSize(), n_output_tokens=len(id_to_target), pad_id=pad_id,
                             encoder_type=encoder_type, n_encoder_layers=n_encoder_layers, d_model=d_model)
+
+    # pretrain_resume_encoder_name = 'encoder_q'
+    # # Load pretrained checkpoint
+    # if resume_path:
+    #     assert not resume_path
+    #     logger.info(
+    #         f"Resuming training from pretraining checkpoint {resume_path}, pretrain_resume_encoder_name={pretrain_resume_encoder_name}")
+    #     checkpoint = torch.load(resume_path)
+    #     pretrained_state_dict = checkpoint["model_state_dict"]
+    #     encoder_state_dict = {}
+    #     output_state_dict = {}
+    #     assert pretrain_resume_encoder_name in ["encoder_k", "encoder_q", "encoder"]
+    #
+    #     for key, value in pretrained_state_dict.items():
+    #         if key.startswith(pretrain_resume_encoder_name + ".") and "project_layer" not in key:
+    #             remapped_key = key[len(pretrain_resume_encoder_name + "."):]
+    #             logger.debug(f"Remapping checkpoint key {key} to {remapped_key}. Value mean: {value.mean().item()}")
+    #             encoder_state_dict[remapped_key] = value
+    #         # if key.startswith(
+    #         #         pretrain_resume_encoder_name + ".") and "project_layer.0." in key and pretrain_resume_project:
+    #         #     remapped_key = key[len(pretrain_resume_encoder_name + ".project_layer."):]
+    #         #     logger.debug(
+    #         #         f"Remapping checkpoint project key {key} to output key {remapped_key}. Value mean: {value.mean().item()}")
+    #         #     output_state_dict[remapped_key] = value
+    #     model.encoder.load_state_dict(encoder_state_dict)
+    #     # TODO: check for head key rather than output for MLM
+    #     model.output.load_state_dict(output_state_dict, strict=False)
+    #     logger.info(f"Loaded state dict from {resume_path}")
+
     logger.info(f"Created TypeTransformer {encoder_type} with {count_parameters(model)} params")
     model = nn.DataParallel(model)
     model = model.cuda() if use_cuda else model

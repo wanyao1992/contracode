@@ -186,8 +186,8 @@ def pretrain(
     # Setup distributed
     ngpus_per_node = torch.cuda.device_count()
     config["world_size"] = ngpus_per_node  # only support 1 node
-    mp.spawn(pretrain_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, config), join=True)
-
+    # mp.spawn(pretrain_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, config), join=True)
+    pretrain_worker(0, 1, config)
 
 def pretrain_worker(gpu, ngpus_per_node, config):
     chief_node = gpu == 0
@@ -198,7 +198,7 @@ def pretrain_worker(gpu, ngpus_per_node, config):
             project = "moco-pretrain"
         elif config["loss_mode"] == "hybrid":
             project = "hybrid"
-        wandb.init(name=config["run_name"], config=config, job_type="training", project=project, entity="ml4code")
+        # wandb.init(name=config["run_name"], config=config, job_type="training", project=project, entity="ml4code")
 
     if gpu is not None:
         logger.info("Use GPU: {} for training".format(gpu))
@@ -337,8 +337,8 @@ def pretrain_worker(gpu, ngpus_per_node, config):
             pbar.set_description(f"epoch {epoch} gpu {gpu} step {global_step} loss {loss.item():.4f}")
 
             if chief_node:
-                wandb.log(dict(lr=sched.get_last_lr()[0]))
-                wandb.log(dict(epoch=epoch, **train_metrics["log"]), step=global_step)
+                # wandb.log(dict(lr=sched.get_last_lr()[0]))
+                # wandb.log(dict(epoch=epoch, **train_metrics["log"]), step=global_step)
 
                 # Save checkpoint
                 if config["save_every"] and global_step % config["save_every"] == 0:
@@ -353,7 +353,7 @@ def pretrain_worker(gpu, ngpus_per_node, config):
                                               f"ckpt_pretrain_ep{epoch:04d}_step{global_step:07d}.pth")
                     logger.info(f"Saving checkpoint to {model_file}...")
                     torch.save(checkpoint, model_file)
-                    wandb.save(str(model_file))
+                    # wandb.save(str(model_file))
                     logger.info("Done.")
 
 

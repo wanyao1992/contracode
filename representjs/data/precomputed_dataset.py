@@ -46,7 +46,10 @@ class PrecomputedDataset(torch.utils.data.Dataset):
         if limit_size > 0:
             self.examples = self.examples[:limit_size]
             logger.debug(f"Limited size: took first {limit_size} examples")
-        self.examples = list(map(list, self.examples))
+        # self.examples = list(map(list, self.examples))
+        self.examples = list(map(sorted, map(list, self.examples)))
+        # self.examples =[item.sort() for item in list(map(list, self.examples))]
+
         logger.debug("Converted examples to lists of alternatives")
         if min_alternatives:
             self.examples = list(filter(lambda ex: len(ex) >= min_alternatives, self.examples))
